@@ -81,8 +81,8 @@ PORTMAP=$(podman port "$NAME" 2>/dev/null)
     Free the port, then run this script again."
 ok "container started, published: $(echo "$PORTMAP" | tr '\n' ' ')"
 
-step "5/7  waiting for first-time initialisation (loads ~175MB, up to 5 min)"
-for i in $(seq 1 100); do
+step "5/7  waiting for first-time initialisation (loads ~175MB; slow disks need 20+ min)"
+for i in $(seq 1 300); do
   # "ready to accept connections" is printed TWICE: once for the temporary server used
   # during init, once for real. Only "init process complete" means the SQL files have all
   # run — including the grants, which come last. Starting the app before that leaves it

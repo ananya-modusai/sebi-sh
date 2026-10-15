@@ -115,7 +115,7 @@ PORTMAP=$(podman port "$NAME" 2>/dev/null)
 ok "container started, published: $(echo "$PORTMAP" | tr '\n' ' ')"
 
 step "6/8  waiting for the application"
-for i in $(seq 1 60); do
+for i in $(seq 1 225); do
   podman logs "$NAME" 2>&1 | grep -q "Application startup complete" && { ok "application up"; break; }
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
     podman logs --tail 30 "$NAME"; die "[A12] container exited at startup"; }

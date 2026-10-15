@@ -46,7 +46,7 @@ Expected, in order:
 | `2/7 loading the image` | `OK  loaded docker.io/olamzar/modus-db:1.3` |
 | `3/7 persistent storage` | `OK  volume modus_pgdata created` |
 | `4/7 starting the container` | `OK  container started, published: 0.0.0.0:5432->5432/tcp` |
-| `5/7 waiting for init` | `OK  database ready` (up to 5 minutes) |
+| `5/7 waiting for init` | `OK  database ready` — **up to 30 minutes on a slow disk** |
 | `6/7 verifying the data` | `tables=36  companies=247  users_with_passwords=5` |
 | `7/7 firewall and auto-start` | `OK  5432 opened to <app-vm-ip> only` |
 
@@ -103,6 +103,31 @@ Then open `http://<app-vm-ip>:8091` and sign in.
 
 ---
 
+## 2b. Two things that look like failure and are not
+
+**`podman ps` shows nothing.** Containers belong to the user that started them. The
+scripts run under `sudo`, so the containers are root's:
+
+```bash
+sudo podman ps -a
+```
+
+Plain `podman ps` lists *your* containers and will be empty. This catches everyone once.
+
+**A script times out but the container carries on.** Giving up on waiting does not stop
+anything. Postgres keeps loading; the application keeps retrying the database. If a script
+reports a timeout, check the real state before redoing anything:
+
+```bash
+sudo podman exec modus-db psql -U modus -d surveillance -tAc \
+     "SELECT count(*) FROM surveillance_sebi.companies"     # want 247
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8091/api/companies   # 401 = healthy
+```
+
+Both good means the deployment succeeded and the script simply lost patience.
+
+---
+
 ## 3. When something goes wrong
 
 On either VM:
@@ -154,7 +179,7 @@ Every stopping point prints a code in brackets. **Text me the code and nothing e
 | `D05` | `podman run` refused | send the log |
 | `D06` | running but no ports published | port conflict — `ss -tlnp \| grep :5432` |
 | `D07` | container died during load | usually disk space — `df -h` |
-| `D08` | load took over 10 minutes | slow disk; re-run, or send the log |
+| `D08` | load took over 30 minutes | probably STILL loading — check the count before re-running |
 | `D09` | fewer than 36 tables | schema did not load |
 | `D10` | fewer than 247 companies | data did not load; see `D11` |
 | `D11` | **volume was left half-loaded** | `podman volume rm modus_pgdata` then re-run |
@@ -179,7 +204,7 @@ Every stopping point prints a code in brackets. **Text me the code and nothing e
 | `A10` | running but no ports published | port conflict |
 | `A11` | `podman run` refused | send the log |
 | `A12` | container died at startup | usually cannot reach the database |
-| `A13` | app took over 4 minutes | send the log |
+| `A13` | app took over 15 minutes | usually still waiting on the DB; it retries forever |
 | `A14` | UI not answering 200 | send the log |
 | `A15` | API not answering 200 | send the log |
 | `A16` | could not open the port | open it by hand |
