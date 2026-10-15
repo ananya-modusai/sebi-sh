@@ -91,7 +91,7 @@ Takes 15–25 minutes, writes about 1.9 GB to `Desktop\modus-transfer\`:
 
 ```
 modus-db-1.3.tar.gz
-modus-app-2.4.tar.gz
+modus-app-2.5.tar.gz
 checksums.txt
 ```
 
@@ -99,7 +99,7 @@ Then:
 
 1. Move both files to the VMs with **ARCON PAM**
    - `modus-db-1.3.tar.gz` → the **database** VM
-   - `modus-app-2.4.tar.gz` → the **application** VM
+   - `modus-app-2.5.tar.gz` → the **application** VM
 2. On each VM, confirm it arrived intact:
    ```
    sha256sum modus-db-1.3.tar.gz

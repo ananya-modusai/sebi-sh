@@ -83,11 +83,13 @@ ok "container started, published: $(echo "$PORTMAP" | tr '\n' ' ')"
 
 step "5/7  waiting for first-time initialisation (loads ~175MB, up to 5 min)"
 for i in $(seq 1 100); do
-  if podman logs "$NAME" 2>&1 | grep -q "database system is ready to accept connections"; then
-    if podman logs "$NAME" 2>&1 | grep -q "PostgreSQL init process complete" \
-       || podman exec "$NAME" pg_isready -U modus -d surveillance >/dev/null 2>&1; then
-      ok "database ready"; break
-    fi
+  # "ready to accept connections" is printed TWICE: once for the temporary server used
+  # during init, once for real. Only "init process complete" means the SQL files have all
+  # run — including the grants, which come last. Starting the app before that leaves it
+  # unable to create its ingest tables, and every later batch 500s.
+  if podman logs "$NAME" 2>&1 | grep -q "PostgreSQL init process complete"; then
+    podman exec "$NAME" pg_isready -U modus -d surveillance >/dev/null 2>&1 \
+      && { ok "database ready (init complete)"; break; }
   fi
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
     podman logs --tail 30 "$NAME"; die "[D07] container exited during init"; }

@@ -13,8 +13,8 @@
 # ===========================================================================
 set -uo pipefail
 
-IMAGE_TAR="${IMAGE_TAR:-modus-app-2.4.tar.gz}"
-IMAGE="${IMAGE:-docker.io/olamzar/modus-app:2.4}"
+IMAGE_TAR="${IMAGE_TAR:-modus-app-2.5.tar.gz}"
+IMAGE="${IMAGE:-docker.io/olamzar/modus-app:2.5}"
 NAME="modus-app"
 PORT="${PORT:-3000}"                       # what SEBI opened; matches the WhatsApp thread
 DB_VM_IP="${DB_VM_IP:-}"

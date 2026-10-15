@@ -12,7 +12,7 @@ REM
 REM  This is for TESTING on Windows. The RHEL VMs use deploy-db.sh / deploy-app.sh.
 REM ===========================================================================
 
-set "APP_IMAGE=olamzar/modus-app:2.4"
+set "APP_IMAGE=olamzar/modus-app:2.5"
 set "DB_IMAGE=olamzar/modus-db:1.3"
 set "PORT=3000"
 set "LOG=%TEMP%\modus-start.log"
@@ -103,14 +103,20 @@ echo [5/7] Loading data ^(up to 5 minutes the first time^)...
 set "COMPANIES=0"
 for /l %%i in (1,1,60) do (
   timeout /t 6 /nobreak >nul
-  docker exec modus-db psql -U modus -d surveillance -tAc "SELECT count(*) FROM surveillance_sebi.companies" > "%TEMP%\mc.txt" 2>nul
-  set /p C=<"%TEMP%\mc.txt"
-  set "C=!C: =!"
-  if defined C (
-    if !C! GTR 0 (
-      set "COMPANIES=!C!"
-      echo       loaded - !C! companies
-      goto :dbready
+  REM Wait for the init scripts to FINISH, not merely for the server to answer. The
+  REM grants run last; starting the application before them leaves it unable to create
+  REM its ingest tables, and every later data push fails with a 500.
+  docker logs modus-db 2>&1 | findstr /C:"PostgreSQL init process complete" >nul 2>&1
+  if not errorlevel 1 (
+    docker exec modus-db psql -U modus -d surveillance -tAc "SELECT count(*) FROM surveillance_sebi.companies" > "%TEMP%\mc.txt" 2>nul
+    set /p C=<"%TEMP%\mc.txt"
+    set "C=!C: =!"
+    if defined C (
+      if !C! GTR 0 (
+        set "COMPANIES=!C!"
+        echo       loaded - !C! companies
+        goto :dbready
+      )
     )
   )
   echo       still loading... ^(%%i of 60^)

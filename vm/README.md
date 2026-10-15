@@ -71,7 +71,7 @@ sudo APP_VM_IP=<app-vm-ip> bash deploy-db.sh
 ## 2. Application VM
 
 ```bash
-sudo DB_VM_IP=<db-vm-ip> THIS_VM_IP=<app-vm-ip> INGEST_SECRET=<secret> bash deploy-app.sh
+sudo DB_VM_IP=<db-vm-ip> THIS_VM_IP=<app-vm-ip> PORT=8091 INGEST_SECRET=<secret> bash deploy-app.sh
 ```
 
 **`THIS_VM_IP` must be the address analysts type in their browser.** Evidence-image
@@ -86,17 +86,17 @@ Expected, in order:
 
 | Step | Expect |
 |---|---|
-| `0/8 checking what you passed in` | `OK  database at <ip>, this VM is <ip>, serving on :3000` |
+| `0/8 checking what you passed in` | `OK  database at <ip>, this VM is <ip>, serving on :8091` |
 | `1/8 checking podman` | `OK` |
-| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:2.4` (slow, it is large) |
+| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:2.5` (slow, it is large) |
 | `3/8 can this VM reach the database?` | `OK  <db-ip>:5432 reachable` |
 | `4/8 persistent storage` | `OK  volume modus_blobs` |
-| `5/8 starting the container` | `OK  container started, published: 0.0.0.0:3000->8080/tcp` |
+| `5/8 starting the container` | `OK  container started, published: 0.0.0.0:8091->8080/tcp` |
 | `6/8 waiting for the application` | `OK  application up` |
 | `7/8 checking it serves` | `OK  UI responds` / `OK  API responds` |
-| `8/8 firewall and auto-start` | `OK  3000/tcp opened` / `OK  will restart after a reboot` |
+| `8/8 firewall and auto-start` | `OK  8091/tcp opened` / `OK  will restart after a reboot` |
 
-Then open `http://<app-vm-ip>:3000` and sign in.
+Then open `http://<app-vm-ip>:8091` and sign in.
 
 **Check that evidence screenshots render.** That is the single check that proves
 `THIS_VM_IP` was right. Everything else can pass while this is broken.
@@ -120,7 +120,7 @@ Send the file if you can move it; photograph the summary if you cannot.
 
 ## Notes that save time
 
-**Only port 3000 should ever be published** on the application VM. The object store
+**Only the one published port (8091) should ever be exposed** on the application VM. The object store
 is deliberately bound to `127.0.0.1` inside the container and proxied — publishing
 9000 would expose it directly.
 
@@ -175,14 +175,14 @@ Every stopping point prints a code in brackets. **Text me the code and nothing e
 | `A06` | tar not in this directory | move it here |
 | `A07` | image not loaded, no internet | `podman images`, then pass `IMAGE=` |
 | `A08` | cannot reach the database VM | DB VM firewall, or it is not running |
-| `A09` | port 3000 already in use | `ss -tlnp \| grep :3000` |
+| `A09` | the published port is already in use | `ss -tlnp \| grep :8091` |
 | `A10` | running but no ports published | port conflict |
 | `A11` | `podman run` refused | send the log |
 | `A12` | container died at startup | usually cannot reach the database |
 | `A13` | app took over 4 minutes | send the log |
 | `A14` | UI not answering 200 | send the log |
 | `A15` | API not answering 200 | send the log |
-| `A16` | could not open 3000 | open it by hand |
+| `A16` | could not open the port | open it by hand |
 | `A17` | systemd unit not installed | runs now, not after a reboot |
 
 ### What "it worked" looks like
@@ -198,34 +198,53 @@ APP VM : UI responds / API responds
 
 ## 4. Data delivery — the poller
 
-This VM cannot be reached from outside, so nothing is pushed to it. `poller.py` asks the
-processing tier what is waiting, fetches it, and feeds it into the container's ingest API
-on localhost. Standard library only — nothing to install.
+This VM cannot be reached from outside, so nothing is pushed to it. The poller asks the
+processing tier what is waiting, fetches it, and feeds it into the application container
+over localhost.
 
-### Install
+It ships **inside `modus-app:2.5`** and runs as a second container from that same image,
+so there is nothing extra to install and everything stays containerised.
+
+### Start it
 
 ```bash
-sudo mkdir -p /opt/modus
-sudo cp poller.py /opt/modus/
-sudo cp modus-poller.service /etc/systemd/system/
-sudo nano /etc/systemd/system/modus-poller.service
+podman run -d --name modus-poller --restart=always \
+  --network host --user 0 \
+  -v modus_poller_state:/state:Z \
+  -e PROCESSING_URL=https://CHANGE-ME \
+  -e INGEST_KEY_ID=modus-processing \
+  -e INGEST_SECRET=CHANGE-ME \
+  -e CONTAINER_URL=http://localhost:8091 \
+  -e HTTPS_PROXY=http://CHANGE-ME:PORT \
+  -e HTTP_PROXY=http://CHANGE-ME:PORT \
+  -e NO_PROXY=localhost,127.0.0.1 \
+  -e POLL_INTERVAL_SECONDS=300 \
+  -e POLL_STATE_FILE=/state/state.json \
+  --entrypoint python3 \
+  docker.io/olamzar/modus-app:2.5 /opt/modus/poller.py
 ```
 
-Five values to set, nothing else:
+Five values to change: `PROCESSING_URL`, `INGEST_SECRET`, the two proxy lines, and
+`CONTAINER_URL` if the published port is not 8091.
 
-| Setting | Value |
+Three flags that are not optional:
+
+| Flag | Why |
 |---|---|
-| `PROCESSING_URL` | our API, e.g. `https://sebi-processing.modusai.net` |
-| `INGEST_SECRET` | the same secret the container was started with |
-| `CONTAINER_URL` | `http://localhost:8091` — **must match the published port** |
-| `HTTPS_PROXY` / `HTTP_PROXY` | SEBI's outbound proxy, e.g. `http://proxy.sebi.gov.in:8080` |
-| `POLL_INTERVAL_SECONDS` | `300` unless they want faster |
+| `--user 0` | the image runs as uid 999 and cannot write to the state volume otherwise |
+| `--network host` | lets it reach the application on `localhost:8091` |
+| `NO_PROXY=localhost,127.0.0.1` | without it, it tries to reach its own container through SEBI's proxy, which refuses |
 
-### Test it before enabling
+If host networking is not permitted, drop `--network host`, put both containers on one
+podman network, and use `-e CONTAINER_URL=http://modus-app:8080`.
+
+### Test before leaving it running
 
 ```bash
-sudo -E PROCESSING_URL=... INGEST_SECRET=... HTTPS_PROXY=... \
-     python3 /opt/modus/poller.py --dry-run
+podman run --rm --network host --user 0 \
+  -e PROCESSING_URL=... -e INGEST_SECRET=... -e HTTPS_PROXY=... \
+  -e CONTAINER_URL=http://localhost:8091 -e NO_PROXY=localhost,127.0.0.1 \
+  --entrypoint python3 docker.io/olamzar/modus-app:2.5 /opt/modus/poller.py --dry-run
 ```
 
 | Output | Meaning |
@@ -233,24 +252,17 @@ sudo -E PROCESSING_URL=... INGEST_SECRET=... HTTPS_PROXY=... \
 | `nothing waiting` | **working** — connected, authenticated, queue empty |
 | `N run(s) waiting` + a table list | **working**, and there is data to collect |
 | `cannot reach the processing tier` | proxy or URL wrong |
-| `GET /api/sync/pending -> 401` | `INGEST_SECRET` does not match ours |
-| `GET /api/sync/pending -> 503` | our side has no secret configured — tell Ananya |
+| `-> 401` | `INGEST_SECRET` does not match ours |
+| `-> 404` | our side has not been deployed yet — tell Ananya |
+| `-> 503` | our side has no secret configured — tell Ananya |
 
-Then one real pass:
+Then one real pass with `--once` instead of `--dry-run`. Expect a line per table and
+`run <id> complete — N batches`.
 
-```bash
-sudo -E ... python3 /opt/modus/poller.py --once
-```
-
-Expect a line per table and `run <id> complete — N batches`.
-
-### Enable
+### Watching it
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now modus-poller
-sudo systemctl status modus-poller
-journalctl -u modus-poller -f
+podman logs -f modus-poller
 ```
 
 ### Notes
@@ -262,5 +274,5 @@ one repeated page, never a half-loaded company.
 A company only becomes visible when its run **commits**, so analysts never see a partial
 pull.
 
-`NO_PROXY=localhost,127.0.0.1` matters: without it the poller would try to reach its own
-container through SEBI's proxy, which will refuse.
+`poller.py` and `modus-poller.service` are also in this folder if you would rather run it
+with systemd on the host than as a container.
