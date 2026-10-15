@@ -103,6 +103,26 @@ Then open `http://<app-vm-ip>:8091` and sign in.
 
 ---
 
+## 2a. Is it working?
+
+```bash
+sudo bash check.sh
+```
+
+Four lines and a verdict, on either VM. **Always with `sudo`** — it says so itself if you
+forget.
+
+If you only want one command, this is the one that matters:
+
+```bash
+sudo podman exec modus-db psql -U modus -d surveillance -tAc \
+     "SELECT count(*) FROM surveillance_sebi.companies"
+```
+
+A number means the database is fine. An error or `0` means it is not.
+
+---
+
 ## 2b. Two things that look like failure and are not
 
 **`podman ps` shows nothing.** Containers belong to the user that started them. The
@@ -113,6 +133,11 @@ sudo podman ps -a
 ```
 
 Plain `podman ps` lists *your* containers and will be empty. This catches everyone once.
+To stop it catching you twice:
+
+```bash
+echo "alias podman='sudo podman'" >> ~/.bashrc && source ~/.bashrc
+```
 
 **A script times out but the container carries on.** Giving up on waiting does not stop
 anything. Postgres keeps loading; the application keeps retrying the database. If a script

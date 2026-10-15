@@ -135,6 +135,23 @@ def _send_blobs(rows: list[dict], column: str, seen: set[str]) -> int:
     return len(urls)
 
 
+def sync_users(*, dry_run: bool) -> int:
+    """Bring the local access list in line with the processing tier.
+
+    Runs every pass, independently of whether any company data is waiting: an account
+    granted or revoked in the control panel must take effect here without waiting for
+    the next pipeline run. The far side converges on the list it is given, so sending
+    the same list twice changes nothing.
+    """
+    users = _get_json("/api/sync/users")["users"]
+    if dry_run:
+        log.info("access list: %d user(s) — would apply", len(users))
+        return 0
+    _post_container("/users", {"users": users})
+    log.info("access list: %d user(s) applied", len(users))
+    return len(users)
+
+
 def collect(run: dict, state: dict, *, dry_run: bool) -> bool:
     """Pull one run. Returns True if it completed."""
     run_id = run["run_id"]
@@ -199,6 +216,11 @@ def collect(run: dict, state: dict, *, dry_run: bool) -> bool:
 
 def one_pass(*, dry_run: bool) -> int:
     state = _load_state()
+    # Users first: an analyst who cannot log in does not care that the data arrived.
+    try:
+        sync_users(dry_run=dry_run)
+    except Exception:                           # noqa: BLE001 - never block data on this
+        log.exception("could not sync the access list; continuing with data")
     waiting = _get_json("/api/sync/pending")["runs"]
     if not waiting:
         log.info("nothing waiting")
