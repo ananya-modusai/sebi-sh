@@ -7,8 +7,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 # Everything the poller needs. Edit these five, nothing else.
-Environment=PROCESSING_URL=https://CHANGE-ME
-Environment=INGEST_KEY_ID=modus-processing
+Environment=PROCESSING_URL=https://sebi-processing-api.modusai.net
+Environment=INGEST_KEY_ID=k1
 Environment=INGEST_SECRET=CHANGE-ME
 Environment=CONTAINER_URL=http://localhost:8091
 Environment=POLL_INTERVAL_SECONDS=300

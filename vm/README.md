@@ -261,8 +261,8 @@ so there is nothing extra to install and everything stays containerised.
 podman run -d --name modus-poller --restart=always \
   --network host --user 0 \
   -v modus_poller_state:/state:Z \
-  -e PROCESSING_URL=https://CHANGE-ME \
-  -e INGEST_KEY_ID=modus-processing \
+  -e PROCESSING_URL=https://sebi-processing-api.modusai.net \
+  -e INGEST_KEY_ID=k1 \
   -e INGEST_SECRET=CHANGE-ME \
   -e CONTAINER_URL=http://localhost:8091 \
   -e HTTPS_PROXY=http://CHANGE-ME:PORT \
