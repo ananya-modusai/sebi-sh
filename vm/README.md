@@ -21,7 +21,7 @@ time, no downside.
 Then confirm the image arrived intact:
 
 ```bash
-sha256sum modus-db-1.3.tar.gz
+sha256sum modus-db-2.0.tar.gz
 ```
 
 Must match `checksums.txt` from the workstation. **Do not skip this.** A truncated
@@ -43,11 +43,11 @@ Expected, in order:
 | Step | Expect |
 |---|---|
 | `1/7 checking podman` | `OK  podman version 4.x` |
-| `2/7 loading the image` | `OK  loaded docker.io/olamzar/modus-db:1.3` |
+| `2/7 loading the image` | `OK  loaded docker.io/olamzar/modus-db:2.0` |
 | `3/7 persistent storage` | `OK  volume modus_pgdata created` |
 | `4/7 starting the container` | `OK  container started, published: 0.0.0.0:5432->5432/tcp` |
 | `5/7 waiting for init` | `OK  database ready` — **up to 30 minutes on a slow disk** |
-| `6/7 verifying the data` | `tables=36  companies=247  users_with_passwords=5` |
+| `6/7 verifying the data` | `tables=36  companies=20  users_with_passwords=5` |
 | `7/7 firewall and auto-start` | `OK  5432 opened to <app-vm-ip> only` |
 
 It finishes by printing **this VM's IP address**. Write it down — the application VM
@@ -88,7 +88,7 @@ Expected, in order:
 |---|---|
 | `0/8 checking what you passed in` | `OK  database at <ip>, this VM is <ip>, serving on :8091` |
 | `1/8 checking podman` | `OK` |
-| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:2.5` (slow, it is large) |
+| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:3.0` (slow, it is large) |
 | `3/8 can this VM reach the database?` | `OK  <db-ip>:5432 reachable` |
 | `4/8 persistent storage` | `OK  volume modus_blobs` |
 | `5/8 starting the container` | `OK  container started, published: 0.0.0.0:8091->8080/tcp` |
@@ -145,7 +145,7 @@ reports a timeout, check the real state before redoing anything:
 
 ```bash
 sudo podman exec modus-db psql -U modus -d surveillance -tAc \
-     "SELECT count(*) FROM surveillance_sebi.companies"     # want 247
+     "SELECT count(*) FROM surveillance_sebi.companies"     # want 20
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8091/api/companies   # 401 = healthy
 ```
 
@@ -252,7 +252,7 @@ This VM cannot be reached from outside, so nothing is pushed to it. The poller a
 processing tier what is waiting, fetches it, and feeds it into the application container
 over localhost.
 
-It ships **inside `modus-app:2.5`** and runs as a second container from that same image,
+It ships **inside `modus-app:3.0`** and runs as a second container from that same image,
 so there is nothing extra to install and everything stays containerised.
 
 ### Start it
@@ -271,7 +271,7 @@ podman run -d --name modus-poller --restart=always \
   -e POLL_INTERVAL_SECONDS=300 \
   -e POLL_STATE_FILE=/state/state.json \
   --entrypoint python3 \
-  docker.io/olamzar/modus-app:2.5 /opt/modus/poller.py
+  docker.io/olamzar/modus-app:3.0 /opt/modus/poller.py
 ```
 
 Five values to change: `PROCESSING_URL`, `INGEST_SECRET`, the two proxy lines, and
@@ -294,7 +294,7 @@ podman network, and use `-e CONTAINER_URL=http://modus-app:8080`.
 podman run --rm --network host --user 0 \
   -e PROCESSING_URL=... -e INGEST_SECRET=... -e HTTPS_PROXY=... \
   -e CONTAINER_URL=http://localhost:8091 -e NO_PROXY=localhost,127.0.0.1 \
-  --entrypoint python3 docker.io/olamzar/modus-app:2.5 /opt/modus/poller.py --dry-run
+  --entrypoint python3 docker.io/olamzar/modus-app:3.0 /opt/modus/poller.py --dry-run
 ```
 
 | Output | Meaning |

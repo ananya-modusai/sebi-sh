@@ -12,8 +12,8 @@ REM
 REM  This is for TESTING on Windows. The RHEL VMs use deploy-db.sh / deploy-app.sh.
 REM ===========================================================================
 
-set "APP_IMAGE=olamzar/modus-app:2.5"
-set "DB_IMAGE=olamzar/modus-db:1.3"
+set "APP_IMAGE=olamzar/modus-app:3.0"
+set "DB_IMAGE=olamzar/modus-db:2.0"
 set "PORT=3000"
 set "LOG=%TEMP%\modus-start.log"
 
@@ -26,8 +26,8 @@ if not defined INGEST_SECRET set "INGEST_SECRET="
 
 echo. > "%LOG%"
 echo ===========================================================
-echo  MODUS - starting up. This takes 10-15 minutes the first
-echo  time (4 GB of images). Leave the window open.
+echo  MODUS - starting up. This takes 5-8 minutes the first
+echo  time (1.3 GB of images). Leave the window open.
 echo ===========================================================
 echo.
 
@@ -52,7 +52,7 @@ if errorlevel 1 (
 
 docker image inspect %APP_IMAGE% >nul 2>&1
 if errorlevel 1 (
-  echo       pulling application image ^(about 4 GB^)...
+  echo       pulling application image ^(about 1.3 GB^)...
   docker pull %APP_IMAGE% >>"%LOG%" 2>&1
   if errorlevel 1 echo       [W03] FAILED to pull %APP_IMAGE% & goto :fail
 ) else ( echo       application image already here )
@@ -187,7 +187,7 @@ echo.
 echo    Open:      http://localhost:%PORT%
 echo    Sign in:   with the account and password Ananya gave you
 echo.
-echo    companies in database : %COMPANIES%
+echo    companies in database : %COMPANIES%    ^(want 20^)
 echo    UI                    : %UICODE%    ^(want 200^)
 echo    API docs              : %APICODE%    ^(want 200^)
 echo    data endpoint         : %DATACODE%    ^(401 is CORRECT - auth is working^)

@@ -31,14 +31,14 @@ It prints progress as it goes. What you should see:
 | `[2/7] Downloading images` | `OK` (or "already here") |
 | `[3/7] Network, storage...` | `ports 3000 and 5432 are free` |
 | `[4/7] Starting the database` | `started` |
-| `[5/7] Loading data` | **`loaded - 247 companies`** |
+| `[5/7] Loading data` | **`loaded - 20 companies`** |
 | `[6/7] Starting the application` | `ports published: 8080/tcp -> 0.0.0.0:3000` |
 | `[7/7] Waiting for it to answer` | `READY` |
 
 Then the summary:
 
 ```
-companies in database : 247
+companies in database : 20
 UI                    : 200     (want 200)
 API docs              : 200     (want 200)
 data endpoint         : 401     (401 is CORRECT - auth is working)
@@ -90,19 +90,19 @@ windows-save.cmd
 Takes 15–25 minutes, writes about 1.9 GB to `Desktop\modus-transfer\`:
 
 ```
-modus-db-1.3.tar.gz
-modus-app-2.5.tar.gz
+modus-db-2.0.tar.gz
+modus-app-3.0.tar.gz
 checksums.txt
 ```
 
 Then:
 
 1. Move both files to the VMs with **ARCON PAM**
-   - `modus-db-1.3.tar.gz` → the **database** VM
-   - `modus-app-2.5.tar.gz` → the **application** VM
+   - `modus-db-2.0.tar.gz` → the **database** VM
+   - `modus-app-3.0.tar.gz` → the **application** VM
 2. On each VM, confirm it arrived intact:
    ```
-   sha256sum modus-db-1.3.tar.gz
+   sha256sum modus-db-2.0.tar.gz
    ```
    It must match `checksums.txt`. **Check this every time** — a truncated transfer
    fails later with an error that says nothing about truncation, and you will spend
