@@ -16,10 +16,11 @@ set -uo pipefail
 IMAGE_TAR="${IMAGE_TAR:-modus-app-2.5.tar.gz}"
 IMAGE="${IMAGE:-docker.io/olamzar/modus-app:2.5}"
 NAME="modus-app"
-PORT="${PORT:-3000}"                       # what SEBI opened; matches the WhatsApp thread
+PORT="${PORT:-8091}"                       # what SEBI opened for the analyst browsers
 DB_VM_IP="${DB_VM_IP:-}"
 THIS_VM_IP="${THIS_VM_IP:-}"
 INGEST_SECRET="${INGEST_SECRET:-}"         # must match the processing tier exactly
+INGEST_KEY_ID="${INGEST_KEY_ID:-k1}"       # the processing tier answers to this id, not a name
 LOG=/tmp/modus-deploy-app.log
 
 exec > >(tee -a "$LOG") 2>&1
@@ -103,7 +104,7 @@ podman run -d --name "$NAME" --pull=never \
   -e BLOB_PUBLIC_URL="http://${THIS_VM_IP}:${PORT}" \
   -e REPORT_APP_URL="http://localhost:8080/" \
   -e SEBI_ADMIN_EMAIL=ananya@modussecure.com \
-  -e INGEST_KEY_ID=modus-processing \
+  -e INGEST_KEY_ID="$INGEST_KEY_ID" \
   -e INGEST_SECRET="$INGEST_SECRET" \
   "$IMAGE" >/dev/null || die "[A11] podman run failed — see the log"
 PORTMAP=$(podman port "$NAME" 2>/dev/null)
@@ -119,8 +120,16 @@ for i in $(seq 1 225); do
   podman logs "$NAME" 2>&1 | grep -q "Application startup complete" && { ok "application up"; break; }
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
     podman logs --tail 30 "$NAME"; die "[A12] container exited at startup"; }
+  # Say something every minute. The original printed nothing for four minutes and then
+  # declared a timeout, which reads as a crash when it is just waiting on the database.
+  [ $((i % 15)) -eq 0 ] && printf '     still starting, %ds — usually waiting on the database
+' $((i * 4))
   sleep 4
-  [ "$i" = 60 ] && { podman logs --tail 20 "$NAME"; die "[A13] timed out waiting for startup"; }
+  [ "$i" = 225 ] && { podman logs --tail 20 "$NAME"
+    die "[A13] not up after 15 minutes. It retries the database forever, so it may still
+    come good once the DB VM finishes loading. Giving up here does not stop it.
+        sudo bash check.sh
+    A 401 on the data endpoint there means it is healthy."; }
 done
 
 step "7/8  checking it serves"

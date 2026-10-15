@@ -93,8 +93,17 @@ for i in $(seq 1 300); do
   fi
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
     podman logs --tail 30 "$NAME"; die "[D07] container exited during init"; }
+  # Say something every ~2 minutes. Silence for ten minutes reads as a hang, and the
+  # original script printed nothing at all until it gave up.
+  [ $((i % 20)) -eq 0 ] && printf '     still loading, %dm elapsed — normal on a slow disk
+' $((i / 10))
   sleep 6
-  [ "$i" = 100 ] && die "[D08] timed out waiting for init — see $LOG"
+  [ "$i" = 300 ] && die "[D08] not ready after 30 minutes.
+    It is probably STILL LOADING — giving up here does not stop the container.
+    Check before redoing anything:
+        sudo podman logs --tail 20 $NAME
+        sudo bash check.sh
+    Note the sudo: the container belongs to root, so plain podman ps shows nothing."
 done
 
 step "6/7  verifying the data"
