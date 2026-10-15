@@ -75,6 +75,17 @@ podman volume exists modus_blobs 2>/dev/null || podman volume create modus_blobs
 ok "volume modus_blobs"
 
 step "5/8  starting the container"
+# Containers from an EARLIER image tag keep their published ports. podman can then
+# start this one while publishing nothing, and `podman ps` still looks healthy while
+# port 3000 refuses every connection — the analyst sees a dead product.
+for C in $(podman ps -a --format '{{.ID}} {{.Image}}' 2>/dev/null | grep -i olamzar | awk '{print $1}'); do
+  podman rm -f "$C" >/dev/null 2>&1 && bad "removed a leftover container ($C)"
+done
+if command -v ss >/dev/null && ss -tln 2>/dev/null | grep -q ":${PORT} "; then
+  die "something else is already listening on ${PORT}.
+    Find it with:  ss -tlnp | grep :${PORT}
+    Stop that, then run this script again."
+fi
 podman rm -f "$NAME" >/dev/null 2>&1
 podman run -d --name "$NAME" --pull=never \
   -p "${PORT}:8080" \
@@ -93,7 +104,13 @@ podman run -d --name "$NAME" --pull=never \
   -e INGEST_KEY_ID=modus-processing \
   -e INGEST_SECRET="$INGEST_SECRET" \
   "$IMAGE" >/dev/null || die "podman run failed — see the log"
-ok "container started, publishing ${PORT} -> 8080"
+PORTMAP=$(podman port "$NAME" 2>/dev/null)
+[ -n "$PORTMAP" ] || die "the container is running but NO ports were published, so
+    nothing can reach it. Usually a port conflict.
+        podman rm -f $NAME
+        ss -tlnp | grep :${PORT}
+    Free the port, then run this script again."
+ok "container started, published: $(echo "$PORTMAP" | tr '\n' ' ')"
 
 step "6/8  waiting for the application"
 for i in $(seq 1 60); do

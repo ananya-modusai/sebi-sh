@@ -58,6 +58,14 @@ for C in modus-app modus-db; do
 done
 
 echo
+echo "--- published ports (EMPTY means nothing can reach the container) ---"
+for C in modus-app modus-db; do
+  podman container exists "$C" 2>/dev/null || continue
+  PM=$(podman port "$C" 2>/dev/null)
+  echo "  $C: ${PM:-*** NONE PUBLISHED — this is the fault ***}"
+done
+
+echo
 echo "--- connectivity ---"
 for t in "localhost:3000" "localhost:5432"; do
   h=${t%%:*}; p=${t##*:}

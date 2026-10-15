@@ -71,7 +71,13 @@ podman run -d --name "$NAME" --pull=never \
   -p "${PORT}:5432" \
   -v modus_pgdata:/var/lib/postgresql/data:Z \
   "$IMAGE" >/dev/null || die "podman run failed — see the log"
-ok "container started"
+PORTMAP=$(podman port "$NAME" 2>/dev/null)
+[ -n "$PORTMAP" ] || die "the container is running but NO ports were published, so the
+    app VM will never reach this database. Usually a port conflict.
+        podman rm -f $NAME
+        ss -tlnp | grep :${PORT}
+    Free the port, then run this script again."
+ok "container started, published: $(echo "$PORTMAP" | tr '\n' ' ')"
 
 step "5/7  waiting for first-time initialisation (loads ~175MB, up to 5 min)"
 for i in $(seq 1 100); do
