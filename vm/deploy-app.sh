@@ -13,8 +13,8 @@
 # ===========================================================================
 set -uo pipefail
 
-IMAGE_TAR="${IMAGE_TAR:-modus-app-3.0.tar.gz}"
-IMAGE="${IMAGE:-docker.io/olamzar/modus-app:3.0}"
+IMAGE_TAR="${IMAGE_TAR:-modus-app-3.3.tar.gz}"
+IMAGE="${IMAGE:-docker.io/olamzar/modus-app:3.3}"
 NAME="modus-app"
 PORT="${PORT:-8091}"                       # what SEBI opened for the analyst browsers
 DB_VM_IP="${DB_VM_IP:-}"
@@ -103,7 +103,7 @@ podman run -d --name "$NAME" --pull=never \
   -e SURVEILLANCE_SCHEMA=surveillance_sebi \
   -e BLOB_PUBLIC_URL="http://${THIS_VM_IP}:${PORT}" \
   -e REPORT_APP_URL="http://localhost:8080/" \
-  -e SEBI_ADMIN_EMAIL=ananya@modussecure.com \
+  -e SEBI_ADMIN_EMAIL=vamshi@modussecure.com \
   -e INGEST_KEY_ID="$INGEST_KEY_ID" \
   -e INGEST_SECRET="$INGEST_SECRET" \
   "$IMAGE" >/dev/null || die "[A11] podman run failed — see the log"

@@ -248,10 +248,17 @@ def main() -> int:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
 
-    if not PROCESSING_URL:
-        log.error("PROCESSING_URL is not set"); return 1
-    if not SECRET:
-        log.error("INGEST_SECRET is not set"); return 1
+    if not (PROCESSING_URL and SECRET):
+        missing = " and ".join(n for n, v in
+                               (("PROCESSING_URL", PROCESSING_URL), ("INGEST_SECRET", SECRET)) if not v)
+        log.warning("%s not set — collection is off; the preloaded data is unaffected", missing)
+        if args.once or args.dry_run:
+            return 1
+        # Under a supervisor, exiting here would restart forever. Idle instead: this is a
+        # legitimate configuration for a deployment that only serves what it shipped with.
+        while not _stop:
+            time.sleep(60)
+        return 0
 
     def _handle(signum, _frame):
         global _stop
@@ -261,6 +268,26 @@ def main() -> int:
     signal.signal(signal.SIGINT, _handle)
 
     log.info("pulling from %s into %s every %ds", PROCESSING_URL, CONTAINER_URL, args.interval)
+
+    # Running alongside the application, this starts before the API finishes booting, and the
+    # web server answers 502 until it does. Waiting turns an alarming traceback on every boot
+    # into one quiet line.
+    for _ in range(60):
+        if _stop:
+            return 0
+        try:
+            urllib.request.urlopen(f"{CONTAINER_URL}/docs", timeout=5)
+            break
+        except urllib.error.HTTPError as exc:
+            # 502/503 is the web server reporting that the application behind it is not up
+            # yet — exactly what we are waiting for. Any other status means it answered.
+            if exc.code not in (502, 503):
+                break
+            time.sleep(5)
+        except Exception:
+            time.sleep(5)
+    else:
+        log.warning("the local API never answered; collecting anyway and relying on retries")
     try:
         _get_json("/api/sync/pending")
     except Exception as exc:                    # noqa: BLE001

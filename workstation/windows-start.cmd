@@ -12,8 +12,8 @@ REM
 REM  This is for TESTING on Windows. The RHEL VMs use deploy-db.sh / deploy-app.sh.
 REM ===========================================================================
 
-set "APP_IMAGE=olamzar/modus-app:3.0"
-set "DB_IMAGE=olamzar/modus-db:2.0"
+set "APP_IMAGE=olamzar/modus-app:3.3"
+set "DB_IMAGE=olamzar/modus-db:2.1"
 set "PORT=3000"
 set "LOG=%TEMP%\modus-start.log"
 
@@ -142,7 +142,7 @@ docker run -d --name modus-app --network modus -p %PORT%:8080 ^
   -e SURVEILLANCE_SCHEMA=surveillance_sebi ^
   -e BLOB_PUBLIC_URL=http://localhost:%PORT% ^
   -e REPORT_APP_URL=http://localhost:8080/ ^
-  -e SEBI_ADMIN_EMAIL=ananya@modussecure.com ^
+  -e SEBI_ADMIN_EMAIL=vamshi@modussecure.com ^
   -e INGEST_KEY_ID=modus-processing ^
   -e INGEST_SECRET=%INGEST_SECRET% ^
   %APP_IMAGE% >>"%LOG%" 2>&1

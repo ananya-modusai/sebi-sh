@@ -9,8 +9,8 @@
 # ===========================================================================
 set -uo pipefail
 
-IMAGE_TAR="${IMAGE_TAR:-modus-db-2.0.tar.gz}"   # the file you SFTP'd across
-IMAGE="${IMAGE:-docker.io/olamzar/modus-db:2.0}"
+IMAGE_TAR="${IMAGE_TAR:-modus-db-2.1.tar.gz}"   # the file you SFTP'd across
+IMAGE="${IMAGE:-docker.io/olamzar/modus-db:2.1}"
 NAME="modus-db"
 PORT="${PORT:-5432}"
 APP_VM_IP="${APP_VM_IP:-}"                       # restricts 5432 to the app VM; blank = any
