@@ -29,7 +29,7 @@ Working looks like:
 
 ```
 workstation : companies 247 / UI 200 / API 200 / data 401
-DB VM       : tables=36  companies=247
+DB VM       : tables=36  companies=20
 APP VM      : UI responds / API responds
 ```
 

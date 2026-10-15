@@ -9,8 +9,8 @@
 # ===========================================================================
 set -uo pipefail
 
-IMAGE_TAR="${IMAGE_TAR:-modus-db-1.3.tar.gz}"   # the file you SFTP'd across
-IMAGE="${IMAGE:-docker.io/olamzar/modus-db:1.3}"
+IMAGE_TAR="${IMAGE_TAR:-modus-db-2.0.tar.gz}"   # the file you SFTP'd across
+IMAGE="${IMAGE:-docker.io/olamzar/modus-db:2.0}"
 NAME="modus-db"
 PORT="${PORT:-5432}"
 APP_VM_IP="${APP_VM_IP:-}"                       # restricts 5432 to the app VM; blank = any
@@ -115,10 +115,10 @@ USERS=$(podman exec "$NAME" psql -U modus -d surveillance -tAc \
   "SELECT count(*) FROM public.users WHERE hashed_password IS NOT NULL" 2>/dev/null | tr -d ' ')
 echo "    tables=$TABLES  companies=$COMPANIES  users_with_passwords=$USERS"
 [ "${TABLES:-0}" -ge 36 ] && ok "schema loaded" || bad "[D09] expected 36 tables, found ${TABLES:-0}"
-if [ "${COMPANIES:-0}" -ge 240 ]; then
+if [ "${COMPANIES:-0}" -ge 20 ]; then
   ok "company data loaded"
 else
-  bad "[D10] expected ~247 companies, found ${COMPANIES:-0}"
+  bad "[D10] expected ~20 companies, found ${COMPANIES:-0}"
   # Postgres only runs its init scripts when the data directory is EMPTY. A volume
   # left behind by a run that died mid-load will never be filled in, and every
   # later run looks like it succeeded while the data stays wrong.

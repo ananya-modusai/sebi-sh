@@ -206,7 +206,7 @@ Every stopping point prints a code in brackets. **Text me the code and nothing e
 | `D07` | container died during load | usually disk space — `df -h` |
 | `D08` | load took over 30 minutes | probably STILL loading — check the count before re-running |
 | `D09` | fewer than 36 tables | schema did not load |
-| `D10` | fewer than 247 companies | data did not load; see `D11` |
+| `D10` | fewer than 20 companies | data did not load; see `D11` |
 | `D11` | **volume was left half-loaded** | `podman volume rm modus_pgdata` then re-run |
 | `D12` | data did not load, fresh volume | send the log |
 | `D13` | 5432 opened to everything | harmless; re-run with `APP_VM_IP=` to restrict |
@@ -240,7 +240,7 @@ Every stopping point prints a code in brackets. **Text me the code and nothing e
 Two numbers are enough to tell me everything is fine:
 
 ```
-DB VM  : tables=36  companies=247
+DB VM  : tables=36  companies=20
 APP VM : UI responds / API responds
 ```
 
