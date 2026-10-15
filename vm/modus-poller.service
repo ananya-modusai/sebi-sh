@@ -1,0 +1,45 @@
+[Unit]
+Description=Modus — pull finished runs into the local container
+Documentation=https://github.com/ananya-modusai/sebi-sh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Everything the poller needs. Edit these five, nothing else.
+Environment=PROCESSING_URL=https://CHANGE-ME
+Environment=INGEST_KEY_ID=modus-processing
+Environment=INGEST_SECRET=CHANGE-ME
+Environment=CONTAINER_URL=http://localhost:8091
+Environment=POLL_INTERVAL_SECONDS=300
+# This VM reaches the outside world only through the proxy. Leave both set; urllib reads them.
+Environment=HTTPS_PROXY=
+Environment=HTTP_PROXY=
+# Never proxy the call into our own container.
+Environment=NO_PROXY=localhost,127.0.0.1
+
+ExecStart=/usr/bin/python3 /opt/modus/poller.py
+WorkingDirectory=/opt/modus
+StateDirectory=modus-poller
+Environment=POLL_STATE_FILE=/var/lib/modus-poller/state.json
+
+Restart=always
+RestartSec=60
+# A pull in progress finishes its current page, then checkpoints, so a restart never
+# re-sends a whole company.
+KillSignal=SIGTERM
+TimeoutStopSec=180
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=modus-poller
+
+# It only needs to read one script and write one state file.
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

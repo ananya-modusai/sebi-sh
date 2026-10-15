@@ -18,6 +18,7 @@ No credentials anywhere in this repository. Sign-in details are issued separatel
 2. `workstation/windows-save.cmd` — turn the images into two `.tar.gz` files
 3. Move them to the VMs with ARCON PAM, plus the `vm/` folder
 4. `vm/` — database VM first, then the application VM
+5. `vm/poller.py` — installs the data feed once both are up
 
 ### If something fails
 

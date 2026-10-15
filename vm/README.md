@@ -193,3 +193,74 @@ Two numbers are enough to tell me everything is fine:
 DB VM  : tables=36  companies=247
 APP VM : UI responds / API responds
 ```
+
+---
+
+## 4. Data delivery — the poller
+
+This VM cannot be reached from outside, so nothing is pushed to it. `poller.py` asks the
+processing tier what is waiting, fetches it, and feeds it into the container's ingest API
+on localhost. Standard library only — nothing to install.
+
+### Install
+
+```bash
+sudo mkdir -p /opt/modus
+sudo cp poller.py /opt/modus/
+sudo cp modus-poller.service /etc/systemd/system/
+sudo nano /etc/systemd/system/modus-poller.service
+```
+
+Five values to set, nothing else:
+
+| Setting | Value |
+|---|---|
+| `PROCESSING_URL` | our API, e.g. `https://sebi-processing.modusai.net` |
+| `INGEST_SECRET` | the same secret the container was started with |
+| `CONTAINER_URL` | `http://localhost:8091` — **must match the published port** |
+| `HTTPS_PROXY` / `HTTP_PROXY` | SEBI's outbound proxy, e.g. `http://proxy.sebi.gov.in:8080` |
+| `POLL_INTERVAL_SECONDS` | `300` unless they want faster |
+
+### Test it before enabling
+
+```bash
+sudo -E PROCESSING_URL=... INGEST_SECRET=... HTTPS_PROXY=... \
+     python3 /opt/modus/poller.py --dry-run
+```
+
+| Output | Meaning |
+|---|---|
+| `nothing waiting` | **working** — connected, authenticated, queue empty |
+| `N run(s) waiting` + a table list | **working**, and there is data to collect |
+| `cannot reach the processing tier` | proxy or URL wrong |
+| `GET /api/sync/pending -> 401` | `INGEST_SECRET` does not match ours |
+| `GET /api/sync/pending -> 503` | our side has no secret configured — tell Ananya |
+
+Then one real pass:
+
+```bash
+sudo -E ... python3 /opt/modus/poller.py --once
+```
+
+Expect a line per table and `run <id> complete — N batches`.
+
+### Enable
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now modus-poller
+sudo systemctl status modus-poller
+journalctl -u modus-poller -f
+```
+
+### Notes
+
+Interrupting it is safe. Progress is checkpointed after **every page**, and re-sending is
+free — the ingest API deduplicates batches by id and blobs by sha256. A dropped link costs
+one repeated page, never a half-loaded company.
+
+A company only becomes visible when its run **commits**, so analysts never see a partial
+pull.
+
+`NO_PROXY=localhost,127.0.0.1` matters: without it the poller would try to reach its own
+container through SEBI's proxy, which will refuse.
