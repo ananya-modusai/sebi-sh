@@ -22,10 +22,12 @@ echo "=== modus db deploy — $(date) ==="
 step(){ printf '\n>>> %s\n' "$1"; }
 ok(){   printf '    OK   %s\n' "$1"; }
 bad(){  printf '    FAIL %s\n' "$1"; }
-die(){  printf '\n*** STOPPED: %s\n*** send %s\n' "$1" "$LOG"; exit 1; }
+die(){  printf '\n*** STOPPED: %s\n*** full log: %s\n' "$1" "$LOG"
+        printf '*** SEND ANANYA JUST THE CODE IN BRACKETS, e.g. "%s" — that is enough.\n' \
+               "$(printf '%s' "$1" | sed -n 's/^\[\([A-Z][0-9]*\)\].*/\1/p')"; exit 1; }
 
 step "1/7  checking podman"
-command -v podman >/dev/null || die "podman not installed"
+command -v podman >/dev/null || die "[D01] podman not installed"
 ok "$(podman --version)"
 
 step "2/7  loading the image"
@@ -38,17 +40,17 @@ elif [ -f "$IMAGE_TAR" ]; then
   # hangs for minutes and fails with a DNS error that never mentions tag names.
   LOADED=$(podman load -i "$IMAGE_TAR" 2>&1 | tee /dev/stderr \
             | sed -n 's/.*[Ll]oaded image[(s)]*: *//p' | tail -1 | tr -d ' ')
-  [ -n "$LOADED" ] || die "podman load failed — the file may be truncated; check its sha256"
+  [ -n "$LOADED" ] || die "[D02] podman load failed — the file may be truncated; check its sha256"
   if [ "$LOADED" != "$IMAGE" ]; then
     bad "tar contained '$LOADED', not '$IMAGE' — using what was in the tar"
     IMAGE="$LOADED"
   fi
   ok "loaded $IMAGE"
 else
-  die "$IMAGE_TAR not found in $(pwd) — SFTP it here first"
+  die "[D03] $IMAGE_TAR not found in $(pwd) — SFTP it here first"
 fi
 podman image exists "$IMAGE" \
-  || die "image '$IMAGE' is not present locally and this VM cannot reach the internet.
+  || die "[D04] image '$IMAGE' is not present locally and this VM cannot reach the internet.
     Check what you have:  podman images
     Then re-run with:     IMAGE=<the name listed> bash $(basename "$0")"
 
@@ -70,9 +72,9 @@ podman rm -f "$NAME" >/dev/null 2>&1
 podman run -d --name "$NAME" --pull=never \
   -p "${PORT}:5432" \
   -v modus_pgdata:/var/lib/postgresql/data:Z \
-  "$IMAGE" >/dev/null || die "podman run failed — see the log"
+  "$IMAGE" >/dev/null || die "[D05] podman run failed — see the log"
 PORTMAP=$(podman port "$NAME" 2>/dev/null)
-[ -n "$PORTMAP" ] || die "the container is running but NO ports were published, so the
+[ -n "$PORTMAP" ] || die "[D06] the container is running but NO ports were published, so the
     app VM will never reach this database. Usually a port conflict.
         podman rm -f $NAME
         ss -tlnp | grep :${PORT}
@@ -88,9 +90,9 @@ for i in $(seq 1 100); do
     fi
   fi
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
-    podman logs --tail 30 "$NAME"; die "container exited during init"; }
+    podman logs --tail 30 "$NAME"; die "[D07] container exited during init"; }
   sleep 6
-  [ "$i" = 100 ] && die "timed out waiting for init — see $LOG"
+  [ "$i" = 100 ] && die "[D08] timed out waiting for init — see $LOG"
 done
 
 step "6/7  verifying the data"
@@ -101,22 +103,22 @@ COMPANIES=$(podman exec "$NAME" psql -U modus -d surveillance -tAc \
 USERS=$(podman exec "$NAME" psql -U modus -d surveillance -tAc \
   "SELECT count(*) FROM public.users WHERE hashed_password IS NOT NULL" 2>/dev/null | tr -d ' ')
 echo "    tables=$TABLES  companies=$COMPANIES  users_with_passwords=$USERS"
-[ "${TABLES:-0}" -ge 36 ] && ok "schema loaded" || bad "expected 36 tables, found ${TABLES:-0}"
+[ "${TABLES:-0}" -ge 36 ] && ok "schema loaded" || bad "[D09] expected 36 tables, found ${TABLES:-0}"
 if [ "${COMPANIES:-0}" -ge 240 ]; then
   ok "company data loaded"
 else
-  bad "expected ~247 companies, found ${COMPANIES:-0}"
+  bad "[D10] expected ~247 companies, found ${COMPANIES:-0}"
   # Postgres only runs its init scripts when the data directory is EMPTY. A volume
   # left behind by a run that died mid-load will never be filled in, and every
   # later run looks like it succeeded while the data stays wrong.
   if [ "$PREEXISTING" = yes ]; then
-    die "this volume already had data, so the load was skipped and it is incomplete.
+    die "[D11] this volume already had data, so the load was skipped and it is incomplete.
     Wipe it and run this script again:
         podman rm -f $NAME
         podman volume rm modus_pgdata
         sudo APP_VM_IP=\${APP_VM_IP:-<app-vm-ip>} bash $(basename "$0")"
   fi
-  die "the data did not load. Send $LOG"
+  die "[D12] the data did not load. Send $LOG"
 fi
 
 step "7/7  firewall and auto-start"
@@ -127,11 +129,11 @@ if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; t
     ok "5432 opened to ${APP_VM_IP} only"
   else
     firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null 2>&1
-    bad "5432 opened to ALL — rerun with APP_VM_IP=<app vm ip> to restrict it"
+    bad "[D13] 5432 opened to ALL — rerun with APP_VM_IP=<app vm ip> to restrict it"
   fi
   firewall-cmd --reload >/dev/null 2>&1
 else
-  bad "firewalld not running — open ${PORT}/tcp yourself if needed"
+  bad "[D14] firewalld not running — open ${PORT}/tcp yourself if needed"
 fi
 
 # podman has no daemon, so --restart does not survive a reboot. systemd does.
@@ -141,7 +143,7 @@ if command -v systemctl >/dev/null; then
     && systemctl daemon-reload \
     && systemctl enable "container-${NAME}.service" >/dev/null 2>&1 \
     && ok "will restart automatically after a reboot" \
-    || bad "could not install the systemd unit (container still runs until reboot)"
+    || bad "[D15] could not install the systemd unit (container still runs until reboot)"
 fi
 
 echo

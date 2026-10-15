@@ -28,16 +28,18 @@ echo "=== modus app deploy — $(date) ==="
 step(){ printf '\n>>> %s\n' "$1"; }
 ok(){   printf '    OK   %s\n' "$1"; }
 bad(){  printf '    FAIL %s\n' "$1"; }
-die(){  printf '\n*** STOPPED: %s\n*** send %s\n' "$1" "$LOG"; exit 1; }
+die(){  printf '\n*** STOPPED: %s\n*** full log: %s\n' "$1" "$LOG"
+        printf '*** SEND ANANYA JUST THE CODE IN BRACKETS, e.g. "%s" — that is enough.\n' \
+               "$(printf '%s' "$1" | sed -n 's/^\[\([A-Z][0-9]*\)\].*/\1/p')"; exit 1; }
 
 step "0/8  checking what you passed in"
-[ -n "$DB_VM_IP" ]   || die "DB_VM_IP is not set. Run: sudo DB_VM_IP=<db vm ip> THIS_VM_IP=<this vm ip> bash deploy-app.sh"
-[ -n "$THIS_VM_IP" ] || die "THIS_VM_IP is not set — it is what analysts type in the browser"
+[ -n "$DB_VM_IP" ]   || die "[A01] DB_VM_IP is not set. Run: sudo DB_VM_IP=<db vm ip> THIS_VM_IP=<this vm ip> bash deploy-app.sh"
+[ -n "$THIS_VM_IP" ] || die "[A02] THIS_VM_IP is not set — it is what analysts type in the browser"
 ok "database at $DB_VM_IP, this VM is $THIS_VM_IP, serving on :$PORT"
-[ -n "$INGEST_SECRET" ] || bad "INGEST_SECRET empty — the processing tier cannot push until it is set"
+[ -n "$INGEST_SECRET" ] || bad "[A03] INGEST_SECRET empty — the processing tier cannot push until it is set"
 
 step "1/8  checking podman"
-command -v podman >/dev/null || die "podman not installed"
+command -v podman >/dev/null || die "[A04] podman not installed"
 ok "$(podman --version)"
 
 step "2/8  loading the image (this one is large, be patient)"
@@ -46,17 +48,17 @@ if podman image exists "$IMAGE"; then
 elif [ -f "$IMAGE_TAR" ]; then
   LOADED=$(podman load -i "$IMAGE_TAR" 2>&1 | tee /dev/stderr \
             | sed -n 's/.*[Ll]oaded image[(s)]*: *//p' | tail -1 | tr -d ' ')
-  [ -n "$LOADED" ] || die "podman load failed — the file may be truncated; check its sha256"
+  [ -n "$LOADED" ] || die "[A05] podman load failed — the file may be truncated; check its sha256"
   if [ "$LOADED" != "$IMAGE" ]; then
     bad "tar contained '$LOADED', not '$IMAGE' — using what was in the tar"
     IMAGE="$LOADED"
   fi
   ok "loaded $IMAGE"
 else
-  die "$IMAGE_TAR not found in $(pwd) — SFTP it here first"
+  die "[A06] $IMAGE_TAR not found in $(pwd) — SFTP it here first"
 fi
 podman image exists "$IMAGE" \
-  || die "image '$IMAGE' is not present locally and this VM cannot reach the internet.
+  || die "[A07] image '$IMAGE' is not present locally and this VM cannot reach the internet.
     Check what you have:  podman images
     Then re-run with:     IMAGE=<the name listed> DB_VM_IP=$DB_VM_IP THIS_VM_IP=$THIS_VM_IP bash $(basename "$0")"
 
@@ -64,7 +66,7 @@ step "3/8  can this VM reach the database?"
 if timeout 8 bash -c "</dev/tcp/${DB_VM_IP}/5432" 2>/dev/null; then
   ok "${DB_VM_IP}:5432 reachable"
 else
-  bad "cannot reach ${DB_VM_IP}:5432 — check the firewall on the DB VM, or that it is running"
+  bad "[A08] cannot reach ${DB_VM_IP}:5432 — check the firewall on the DB VM, or that it is running"
   echo "    continuing anyway; the app retries, but it will show no data until this works"
 fi
 
@@ -82,7 +84,7 @@ for C in $(podman ps -a --format '{{.ID}} {{.Image}}' 2>/dev/null | grep -i olam
   podman rm -f "$C" >/dev/null 2>&1 && bad "removed a leftover container ($C)"
 done
 if command -v ss >/dev/null && ss -tln 2>/dev/null | grep -q ":${PORT} "; then
-  die "something else is already listening on ${PORT}.
+  die "[A09] something else is already listening on ${PORT}.
     Find it with:  ss -tlnp | grep :${PORT}
     Stop that, then run this script again."
 fi
@@ -103,9 +105,9 @@ podman run -d --name "$NAME" --pull=never \
   -e SEBI_ADMIN_EMAIL=ananya@modussecure.com \
   -e INGEST_KEY_ID=modus-processing \
   -e INGEST_SECRET="$INGEST_SECRET" \
-  "$IMAGE" >/dev/null || die "podman run failed — see the log"
+  "$IMAGE" >/dev/null || die "[A11] podman run failed — see the log"
 PORTMAP=$(podman port "$NAME" 2>/dev/null)
-[ -n "$PORTMAP" ] || die "the container is running but NO ports were published, so
+[ -n "$PORTMAP" ] || die "[A10] the container is running but NO ports were published, so
     nothing can reach it. Usually a port conflict.
         podman rm -f $NAME
         ss -tlnp | grep :${PORT}
@@ -116,23 +118,23 @@ step "6/8  waiting for the application"
 for i in $(seq 1 60); do
   podman logs "$NAME" 2>&1 | grep -q "Application startup complete" && { ok "application up"; break; }
   podman ps -a --filter "name=$NAME" --format '{{.Status}}' | grep -q Exited && {
-    podman logs --tail 30 "$NAME"; die "container exited at startup"; }
+    podman logs --tail 30 "$NAME"; die "[A12] container exited at startup"; }
   sleep 4
-  [ "$i" = 60 ] && { podman logs --tail 20 "$NAME"; die "timed out waiting for startup"; }
+  [ "$i" = 60 ] && { podman logs --tail 20 "$NAME"; die "[A13] timed out waiting for startup"; }
 done
 
 step "7/8  checking it serves"
 sleep 5
 code(){ curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$1" 2>/dev/null; }
-[ "$(code http://localhost:${PORT}/)" = 200 ]      && ok "UI responds"       || bad "UI did not return 200"
-[ "$(code http://localhost:${PORT}/docs)" = 200 ]  && ok "API responds"      || bad "API did not return 200"
+[ "$(code http://localhost:${PORT}/)" = 200 ]      && ok "UI responds"       || bad "[A14] UI did not return 200"
+[ "$(code http://localhost:${PORT}/docs)" = 200 ]  && ok "API responds"      || bad "[A15] API did not return 200"
 [ "$(code http://localhost:${PORT}/api/v1/auth/send-otp)" = 405 ] \
   || true   # 405 just means GET on a POST route; presence is what matters
 
 step "8/8  firewall and auto-start"
 if command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then
   firewall-cmd --permanent --add-port="${PORT}/tcp" >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1 \
-    && ok "${PORT}/tcp opened" || bad "could not open ${PORT}/tcp"
+    && ok "${PORT}/tcp opened" || bad "[A16] could not open ${PORT}/tcp"
 else
   bad "firewalld not running — open ${PORT}/tcp yourself if needed"
 fi
@@ -143,7 +145,7 @@ if command -v systemctl >/dev/null; then
     && systemctl daemon-reload \
     && systemctl enable "container-${NAME}.service" >/dev/null 2>&1 \
     && ok "will restart automatically after a reboot" \
-    || bad "could not install the systemd unit (container still runs until reboot)"
+    || bad "[A17] could not install the systemd unit (container still runs until reboot)"
 fi
 
 echo

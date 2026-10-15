@@ -1,84 +1,35 @@
-# Modus surveillance — deployment scripts
+# Modus surveillance — deployment
 
-Scripts to bring the two containers up. **Download the ZIP** (green *Code* button →
-*Download ZIP*) rather than cloning — `git clone` is blocked on some networks, plain
-HTTPS downloads are not.
+**Download the ZIP** (green *Code* button → *Download ZIP*). `git clone` is blocked on
+some networks; plain HTTPS downloads are not.
 
-No credentials are in this repository. Sign-in details are issued separately.
+No credentials anywhere in this repository. Sign-in details are issued separately.
 
----
+### Which folder
 
-## Windows (Docker Desktop) — testing
+| You are on | Use | For |
+|---|---|---|
+| the **Windows workstation** | [`workstation/`](workstation/) | testing locally, and packaging the images for the VMs |
+| a **RHEL VM** | [`vm/`](vm/) | the real deployment |
 
-Unzip, then **double-click**:
+### Order on the day
 
-```
-windows-start.cmd
-```
+1. `workstation/` — test it works here
+2. `workstation/windows-save.cmd` — turn the images into two `.tar.gz` files
+3. Move them to the VMs with ARCON PAM, plus the `vm/` folder
+4. `vm/` — database VM first, then the application VM
 
-It pulls both images, starts them, waits for the database to load, checks that
-everything answers, and prints the URL to open. First run takes 10–15 minutes
-because the images are about 4 GB. Running it again takes seconds — it reuses
-the data.
+### If something fails
 
-| File | What it does |
-|---|---|
-| `windows-start.cmd` | brings everything up and verifies it |
-| `windows-collect.cmd` | when something breaks — writes a report to your Desktop and opens it |
-| `windows-stop.cmd` | stops both containers, keeps the data |
+Every stopping point prints a code in brackets — `D11`, `A08`, `W06`.
+**Send the code, nothing else.** Each folder's README has the full table.
 
-**Requires Docker Desktop to be running** — the whale icon in the system tray
-must be steady, not animating.
-
----
-
-## RHEL VMs (podman) — the real deployment
-
-Two VMs. **Database first**, because the app needs its address.
-
-```bash
-# fix line endings first if these files passed through Windows
-sed -i 's/\r$//' *.sh
-
-# --- DB VM ---
-sudo APP_VM_IP=<app-vm-ip> bash deploy-db.sh
-#   prints this VM's IP at the end — you need it next
-
-# --- APP VM ---
-sudo DB_VM_IP=<db-vm-ip> THIS_VM_IP=<app-vm-ip> INGEST_SECRET=<secret> bash deploy-app.sh
-```
-
-`THIS_VM_IP` **must be the address analysts type in the browser.** Evidence-image
-links are cryptographically signed against it. Get it wrong and every page works
-except the images, which return 403 — the most misleading failure in the system.
-
-When something breaks:
-
-```bash
-sudo bash collect.sh
-```
-
-Writes a full report to `/tmp/` and prints a short summary sized to photograph.
-
----
-
-## The images
+Working looks like:
 
 ```
-olamzar/modus-app:2.4     application (UI + API + web server + object store)
-olamzar/modus-db:1.3      database (PostgreSQL 17)
+workstation : companies 247 / UI 200 / API 200 / data 401
+DB VM       : tables=36  companies=247
+APP VM      : UI responds / API responds
 ```
 
-Both public, both `linux/amd64`. Use these exact tags — earlier ones have known
-faults, including `2.3`, which rejects every administrator request.
-
-Air-gapped machines have no registry access, so pull on a machine that does, then:
-
-```
-docker save olamzar/modus-app:2.4 | gzip > modus-app-2.4.tar.gz
-docker save olamzar/modus-db:1.3  | gzip > modus-db-1.3.tar.gz
-```
-
-Transfer those, put them beside the scripts, and the scripts load them instead of
-pulling. Keep the tag spelling exactly as above — the scripts look the images up by
-that name, and a mismatch makes them try to reach the internet and hang.
+`401` is correct — it means authentication is on.
