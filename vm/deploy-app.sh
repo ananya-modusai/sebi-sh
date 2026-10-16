@@ -13,8 +13,8 @@
 # ===========================================================================
 set -uo pipefail
 
-IMAGE_TAR="${IMAGE_TAR:-modus-app-3.3.tar.gz}"
-IMAGE="${IMAGE:-docker.io/olamzar/modus-app:3.3}"
+IMAGE_TAR="${IMAGE_TAR:-modus-app-5.1.tar.gz}"
+IMAGE="${IMAGE:-docker.io/olamzar/modus-app:5.1}"
 NAME="modus-app"
 PORT="${PORT:-8091}"                       # what SEBI opened for the analyst browsers
 DB_VM_IP="${DB_VM_IP:-}"

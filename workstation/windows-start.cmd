@@ -12,7 +12,7 @@ REM
 REM  This is for TESTING on Windows. The RHEL VMs use deploy-db.sh / deploy-app.sh.
 REM ===========================================================================
 
-set "APP_IMAGE=olamzar/modus-app:3.3"
+set "APP_IMAGE=olamzar/modus-app:5.1"
 set "DB_IMAGE=olamzar/modus-db:2.1"
 set "PORT=3000"
 set "LOG=%TEMP%\modus-start.log"
@@ -45,6 +45,9 @@ REM ---------------------------------------------------------------- 2. images
 echo [2/7] Downloading images ^(the long part - be patient^)...
 docker image inspect %DB_IMAGE% >nul 2>&1
 if errorlevel 1 (
+
+
+  
   echo       pulling database image...
   docker pull %DB_IMAGE% >>"%LOG%" 2>&1
   if errorlevel 1 echo       [W02] FAILED to pull %DB_IMAGE% & goto :fail

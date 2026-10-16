@@ -12,7 +12,7 @@ REM
 REM  Takes 8-12 minutes. The output is about 1.3 GB.
 REM ===========================================================================
 
-set "APP_IMAGE=olamzar/modus-app:3.3"
+set "APP_IMAGE=olamzar/modus-app:5.1"
 set "DB_IMAGE=olamzar/modus-db:2.1"
 set "OUT=%USERPROFILE%\Desktop\modus-transfer"
 
@@ -46,7 +46,7 @@ echo.
 echo  Next:
 echo    1. Move BOTH .tar.gz files to the VMs with ARCON PAM
 echo       - modus-db-2.1.tar.gz   to the DATABASE VM
-echo       - modus-app-3.3.tar.gz  to the APPLICATION VM
+echo       - modus-app-5.1.tar.gz  to the APPLICATION VM
 echo    2. On each VM, confirm the file arrived intact:
 echo         sha256sum modus-db-2.1.tar.gz
 echo       It must match checksums.txt. If it does not, transfer it again -

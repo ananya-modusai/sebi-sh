@@ -88,7 +88,7 @@ Expected, in order:
 |---|---|
 | `0/8 checking what you passed in` | `OK  database at <ip>, this VM is <ip>, serving on :8091` |
 | `1/8 checking podman` | `OK` |
-| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:3.3` (slow, it is large) |
+| `2/8 loading the image` | `OK  loaded docker.io/olamzar/modus-app:5.1` (slow, it is large) |
 | `3/8 can this VM reach the database?` | `OK  <db-ip>:5432 reachable` |
 | `4/8 persistent storage` | `OK  volume modus_blobs` |
 | `5/8 starting the container` | `OK  container started, published: 0.0.0.0:8091->8080/tcp` |
@@ -252,7 +252,7 @@ This VM cannot be reached from outside, so nothing is pushed to it. The poller a
 processing tier what is waiting, fetches it, and feeds it into the application container
 over localhost.
 
-It ships **inside `modus-app:3.3`** and runs as a second container from that same image,
+It ships **inside `modus-app:5.1`** and runs as a second container from that same image,
 so there is nothing extra to install and everything stays containerised.
 
 ### Start it
@@ -271,7 +271,7 @@ podman run -d --name modus-poller --restart=always \
   -e POLL_INTERVAL_SECONDS=300 \
   -e POLL_STATE_FILE=/state/state.json \
   --entrypoint python3 \
-  docker.io/olamzar/modus-app:3.3 /opt/modus/poller.py
+  docker.io/olamzar/modus-app:5.1 /opt/modus/poller.py
 ```
 
 Five values to change: `PROCESSING_URL`, `INGEST_SECRET`, the two proxy lines, and
@@ -294,7 +294,7 @@ podman network, and use `-e CONTAINER_URL=http://modus-app:8080`.
 podman run --rm --network host --user 0 \
   -e PROCESSING_URL=... -e INGEST_SECRET=... -e HTTPS_PROXY=... \
   -e CONTAINER_URL=http://localhost:8091 -e NO_PROXY=localhost,127.0.0.1 \
-  --entrypoint python3 docker.io/olamzar/modus-app:3.3 /opt/modus/poller.py --dry-run
+  --entrypoint python3 docker.io/olamzar/modus-app:5.1 /opt/modus/poller.py --dry-run
 ```
 
 | Output | Meaning |
