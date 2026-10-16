@@ -240,7 +240,11 @@ def relay_active(*, dry_run: bool) -> int:
     # Only ever seed a real name. Falling back to the isin overwrote the names of companies
     # that were already here, leaving unrecognisable rows in their watchlist — the row this
     # was meant to create is worth far less than the ones it damaged.
-    seed = [{"isin": r["isin"], "company_name": r["company_name"]}
+    # is_flagged must be set: the watchlist selects on it, so a seeded company without it is
+    # invisible until its full data arrives — which is precisely the window the seed exists to
+    # cover. A run was started, the company was nowhere on screen, and it looked like nothing
+    # had happened.
+    seed = [{"isin": r["isin"], "company_name": r["company_name"], "is_flagged": True}
             for r in runs
             if r.get("isin") and r.get("company_name")
             and r["company_name"] != r["isin"]]
