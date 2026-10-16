@@ -365,7 +365,6 @@ def collect(run: dict, state: dict, *, dry_run: bool) -> bool:
     blobs_seen: set[str] = set()
     for table in pending:
         name_of_table, seq, after, rows_sent = table["name"], 0, None, 0
-        name = plan.get("company_name") or plan["isin"]
         while True:
             seq += 1
             query = f"?seq={seq}&limit={PAGE}"
@@ -392,7 +391,10 @@ def collect(run: dict, state: dict, *, dry_run: bool) -> bool:
                 progress["batches"] += 1
                 after = page["last_key"]
             # Checkpoint after every page, so a crash resumes here and not at the start.
-            progress["counts"][name] = rows_sent
+            # Keyed by the TABLE, like done_tables below. Keying it by the company put one
+            # entry per run instead of one per table, and commit rejected every run with
+            # "row counts differ" — so nothing ever finished and each pass retried forever.
+            progress["counts"][name_of_table] = rows_sent
             _save_state(state)
             if page["exhausted"]:
                 break
