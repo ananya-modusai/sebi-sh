@@ -21,6 +21,16 @@ DB_VM_IP="${DB_VM_IP:-}"
 THIS_VM_IP="${THIS_VM_IP:-}"
 INGEST_SECRET="${INGEST_SECRET:-}"         # must match the processing tier exactly
 INGEST_KEY_ID="${INGEST_KEY_ID:-k1}"       # the processing tier answers to this id, not a name
+# Where finished runs are collected from. Empty switches collection OFF entirely — the
+# container then serves only the data it shipped with, which is the right state until this
+# VM can actually reach the address. Set it to turn collection on.
+PROCESSING_URL="${PROCESSING_URL:-}"
+# This VM may only reach the outside world through a proxy. urllib reads these, so nothing
+# in the image changes. DB traffic and the container's calls to itself must bypass it —
+# routing those through a proxy fails in a way that looks like the database being down.
+HTTPS_PROXY="${HTTPS_PROXY:-}"
+HTTP_PROXY="${HTTP_PROXY:-}"
+NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,${DB_VM_IP}}"
 LOG=/tmp/modus-deploy-app.log
 
 exec > >(tee -a "$LOG") 2>&1
@@ -38,6 +48,14 @@ step "0/8  checking what you passed in"
 [ -n "$THIS_VM_IP" ] || die "[A02] THIS_VM_IP is not set — it is what analysts type in the browser"
 ok "database at $DB_VM_IP, this VM is $THIS_VM_IP, serving on :$PORT"
 [ -n "$INGEST_SECRET" ] || bad "[A03] INGEST_SECRET empty — the processing tier cannot push until it is set"
+# Say which mode this is. "Nothing is syncing" is otherwise indistinguishable from a fault,
+# and that question has cost more time than any actual failure here.
+if [ -n "$PROCESSING_URL" ] && [ -n "$INGEST_SECRET" ]; then
+  ok "collection ON — will pull from $PROCESSING_URL"
+  [ -n "$HTTPS_PROXY" ] && ok "via proxy $HTTPS_PROXY" || true
+else
+  ok "collection OFF — serving only the preloaded data (set PROCESSING_URL to enable)"
+fi
 
 step "1/8  checking podman"
 command -v podman >/dev/null || die "[A04] podman not installed"
@@ -106,6 +124,10 @@ podman run -d --name "$NAME" --pull=never \
   -e SEBI_ADMIN_EMAIL=vamshi@modussecure.com \
   -e INGEST_KEY_ID="$INGEST_KEY_ID" \
   -e INGEST_SECRET="$INGEST_SECRET" \
+  -e PROCESSING_URL="$PROCESSING_URL" \
+  -e HTTPS_PROXY="$HTTPS_PROXY" \
+  -e HTTP_PROXY="$HTTP_PROXY" \
+  -e NO_PROXY="$NO_PROXY" \
   "$IMAGE" >/dev/null || die "[A11] podman run failed — see the log"
 PORTMAP=$(podman port "$NAME" 2>/dev/null)
 [ -n "$PORTMAP" ] || die "[A10] the container is running but NO ports were published, so
