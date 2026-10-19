@@ -21,15 +21,17 @@ DB_VM_IP="${DB_VM_IP:-}"
 THIS_VM_IP="${THIS_VM_IP:-}"
 INGEST_SECRET="${INGEST_SECRET:-}"         # must match the processing tier exactly
 INGEST_KEY_ID="${INGEST_KEY_ID:-k1}"       # the processing tier answers to this id, not a name
-# Where finished runs are collected from. Empty switches collection OFF entirely — the
-# container then serves only the data it shipped with, which is the right state until this
-# VM can actually reach the address. Set it to turn collection on.
-PROCESSING_URL="${PROCESSING_URL:-}"
-# This VM may only reach the outside world through a proxy. urllib reads these, so nothing
-# in the image changes. DB traffic and the container's calls to itself must bypass it —
-# routing those through a proxy fails in a way that looks like the database being down.
-HTTPS_PROXY="${HTTPS_PROXY:-}"
-HTTP_PROXY="${HTTP_PROXY:-}"
+# Where finished runs are collected from. Already correct for this deployment — override
+# only to point at a different tier, or set it empty to switch collection off entirely and
+# serve nothing but the data the image shipped with.
+PROCESSING_URL="${PROCESSING_URL:-https://sebi-processing-api.modusai.net}"
+# This VM has no direct route out; everything leaves through the site proxy. urllib reads
+# these, so nothing in the image changes. The proxy is HTTP (not SOCKS), which is what makes
+# this work at all — urllib cannot speak SOCKS.
+HTTPS_PROXY="${HTTPS_PROXY:-http://10.201.6.100:1080}"
+HTTP_PROXY="${HTTP_PROXY:-http://10.201.6.100:1080}"
+# The database and the container's calls to itself must NOT go through the proxy. Sending
+# them there fails in a way that reads as the database being down.
 NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,${DB_VM_IP}}"
 LOG=/tmp/modus-deploy-app.log
 
