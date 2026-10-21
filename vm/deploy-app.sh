@@ -33,6 +33,12 @@ HTTP_PROXY="${HTTP_PROXY:-http://10.201.6.100:1080}"
 # The database and the container's calls to itself must NOT go through the proxy. Sending
 # them there fails in a way that reads as the database being down.
 NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,${DB_VM_IP}}"
+# Path to the site's root CA, when the proxy inspects TLS. A proxy that decrypts traffic
+# re-signs it with its own authority, which this image has never heard of — so the handshake
+# is refused and it reads as "cannot connect" rather than as a certificate problem. Point
+# this at the CA file and it is merged with the image's own trust store below.
+SEBI_CA="${SEBI_CA:-}"
+CA_BUNDLE=/opt/modus/ca-bundle.pem          # built here, mounted read-only into the container
 LOG=/tmp/modus-deploy-app.log
 
 exec > >(tee -a "$LOG") 2>&1
@@ -97,6 +103,27 @@ step "4/8  persistent storage for evidence files"
 podman volume exists modus_blobs 2>/dev/null || podman volume create modus_blobs >/dev/null
 ok "volume modus_blobs"
 
+# A TLS-inspecting proxy presents its own certificate, so the image's trust store has to be
+# told about the authority that signed it. Merged rather than replaced: trusting ONLY the
+# site CA would break every other certificate the application validates.
+CA_MOUNT=""
+if [ -n "$SEBI_CA" ]; then
+  if [ ! -r "$SEBI_CA" ]; then
+    die "[A18] SEBI_CA points at '$SEBI_CA', which cannot be read."
+  fi
+  mkdir -p "$(dirname "$CA_BUNDLE")"
+  if podman run --rm --entrypoint cat "$IMAGE" /etc/ssl/certs/ca-certificates.crt \
+       > "$CA_BUNDLE" 2>/dev/null && [ -s "$CA_BUNDLE" ]; then
+    cat "$SEBI_CA" >> "$CA_BUNDLE"
+    CA_MOUNT="-v $CA_BUNDLE:/etc/ssl/certs/ca-bundle-site.crt:ro,Z"
+    ok "trust store: $(grep -c 'BEGIN CERTIFICATE' "$CA_BUNDLE") certificates (image + site CA)"
+  else
+    bad "[A19] could not read the image trust store — continuing without the site CA"
+  fi
+else
+  ok "no site CA supplied (set SEBI_CA=/path/to/ca.pem if the proxy inspects TLS)"
+fi
+
 step "5/8  starting the container"
 # Containers from an EARLIER image tag keep their published ports. podman can then
 # start this one while publishing nothing, and `podman ps` still looks healthy while
@@ -130,6 +157,9 @@ podman run -d --name "$NAME" --pull=never \
   -e HTTPS_PROXY="$HTTPS_PROXY" \
   -e HTTP_PROXY="$HTTP_PROXY" \
   -e NO_PROXY="$NO_PROXY" \
+  -e SSL_CERT_FILE="${CA_MOUNT:+/etc/ssl/certs/ca-bundle-site.crt}" \
+  -e REQUESTS_CA_BUNDLE="${CA_MOUNT:+/etc/ssl/certs/ca-bundle-site.crt}" \
+  $CA_MOUNT \
   "$IMAGE" >/dev/null || die "[A11] podman run failed — see the log"
 PORTMAP=$(podman port "$NAME" 2>/dev/null)
 [ -n "$PORTMAP" ] || die "[A10] the container is running but NO ports were published, so
